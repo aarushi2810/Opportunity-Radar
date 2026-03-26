@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opportunity Radar — Indian Market Signal Intelligence</title>
+    <meta name="description" content="Multi-agent intelligence system that transforms corporate filings, insider trades & regulatory signals into actionable alerts for the Indian stock market.">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔭</text></svg>">
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="header">
+    <div class="header-inner">
+        <div class="logo">
+            <div class="logo-icon">🔭</div>
+            <span class="logo-text">Opportunity Radar</span>
+            <span class="logo-badge" id="modeBadge">Live</span>
+        </div>
+        <div class="header-status">
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="header-stat-value" id="statFilings">0</div>
+                    <div class="header-stat-label">Filings</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="statSignals">0</div>
+                    <div class="header-stat-label">Signals</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="statAlerts">0</div>
+                    <div class="header-stat-label">Alerts</div>
+                </div>
+            </div>
+            <div class="live-indicator">
+                <div class="live-dot" id="liveDot"></div>
+                <span id="liveText">Connecting...</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ── Main Content ────────────────────────────────────────────────────── -->
+<main class="main">
+    <!-- Left Column: Pipeline + Alerts -->
+    <div class="content-area">
+
+        <!-- Pipeline Status -->
+        <div class="pipeline-grid" id="pipelineGrid">
+            <div class="pipeline-node" id="node-watcher">
+                <div class="pipeline-icon">📄</div>
+                <div class="pipeline-label">Filing Watcher</div>
+                <div class="pipeline-status idle" id="status-watcher">idle</div>
+            </div>
+            <div class="pipeline-node" id="node-classifier">
+                <div class="pipeline-icon">🔬</div>
+                <div class="pipeline-label">Signal Classifier</div>
+                <div class="pipeline-status idle" id="status-classifier">idle</div>
+            </div>
+            <div class="pipeline-node" id="node-enricher">
+                <div class="pipeline-icon">🧠</div>
+                <div class="pipeline-label">Context Enricher</div>
+                <div class="pipeline-status idle" id="status-enricher">idle</div>
+            </div>
+            <div class="pipeline-node" id="node-composer">
+                <div class="pipeline-icon">📝</div>
+                <div class="pipeline-label">Alert Composer</div>
+                <div class="pipeline-status idle" id="status-composer">idle</div>
+            </div>
+            <div class="pipeline-node" id="node-orchestrator">
+                <div class="pipeline-icon">🎯</div>
+                <div class="pipeline-label">Orchestrator</div>
+                <div class="pipeline-status idle" id="status-orchestrator">idle</div>
+            </div>
+        </div>
+
+        <!-- Alerts Feed -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">🔔</span>
+                    Live Signal Alerts
+                </div>
+                <div class="card-badge" id="alertCount">0 alerts</div>
+            </div>
+            <div class="card-body">
+                <div class="alerts-feed" id="alertsFeed">
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-state-icon">📡</div>
+                        <div class="empty-state-title">Scanning for signals...</div>
+                        <div class="empty-state-text">The Filing Watcher is polling SEBI, NSE & BSE for new filings. Alerts will appear here in real-time.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <aside class="sidebar">
+
+        <!-- Stats -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">📊</span>
+                    Pipeline Stats
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value" id="totalFilings">0</div>
+                        <div class="stat-label">Filings</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="totalSignals">0</div>
+                        <div class="stat-label">Signals</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="totalAlerts">0</div>
+                        <div class="stat-label">Alerts</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="uptime">0s</div>
+                        <div class="stat-label">Uptime</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signal Distribution -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">📈</span>
+                    Signal Distribution
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="signal-distribution" id="signalDist">
+                    <div class="signal-bar bullish" style="flex: 1"></div>
+                    <div class="signal-bar bearish" style="flex: 0.3"></div>
+                    <div class="signal-bar watch" style="flex: 0.5"></div>
+                    <div class="signal-bar neutral" style="flex: 0.2"></div>
+                </div>
+                <div class="signal-legend">
+                    <div class="signal-legend-item">
+                        <div class="signal-legend-dot" style="background: var(--signal-bullish)"></div>
+                        <span>Bullish <span id="bullishCount">0</span></span>
+                    </div>
+                    <div class="signal-legend-item">
+                        <div class="signal-legend-dot" style="background: var(--signal-bearish)"></div>
+                        <span>Bearish <span id="bearishCount">0</span></span>
+                    </div>
+                    <div class="signal-legend-item">
+                        <div class="signal-legend-dot" style="background: var(--signal-watch)"></div>
+                        <span>Watch <span id="watchCount">0</span></span>
+                    </div>
+                    <div class="signal-legend-item">
+                        <div class="signal-legend-dot" style="background: var(--signal-neutral)"></div>
+                        <span>Neutral <span id="neutralCount">0</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Watchlist -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">👁️</span>
+                    Watchlist
+                </div>
+            </div>
+            <div class="card-body" id="watchlistBody">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Feedback Stats -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">💬</span>
+                    User Feedback
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="feedback-bar" id="feedbackBar">
+                    <div class="feedback-segment dismiss" style="flex: 1">No data</div>
+                </div>
+                <div class="signal-legend" style="margin-top: 8px;">
+                    <div class="signal-legend-item">
+                        <div class="signal-legend-dot" style="background: var(--text-muted)"></div>
+                        <span>Dismiss <span id="fbDismiss">0</span></span>
+                    </div>
+                    <div class="signal-legend-item">
+                        <div class="signal-legend-dot" style="background: var(--accent-amber)"></div>
+                        <span>Watch <span id="fbWatch">0</span></span>
+                    </div>
+                    <div class="signal-legend-item">
+                        <div class="signal-legend-dot" style="background: var(--accent-emerald)"></div>
+                        <span>Buy <span id="fbBuy">0</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

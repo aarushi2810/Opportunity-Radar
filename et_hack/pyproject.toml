@@ -1,0 +1,20 @@
+[project]
+name = "opportunity-radar"
+version = "0.1.0"
+description = "Multi-agent intelligence system for Indian market signals"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "httpx>=0.25.0",
+    "pydantic>=2.5.0",
+    "google-generativeai>=0.8.0",
+    "fakeredis>=2.20.0",
+    "jinja2>=3.1.0",
+    "beautifulsoup4>=4.12.0",
+    "numpy>=1.26.0",
+    "sse-starlette>=1.8.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4.0", "pytest-asyncio>=0.23.0"]
