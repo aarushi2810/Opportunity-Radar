@@ -1,12 +1,12 @@
 # Opportunity Radar 🔭
 
-Multi-Agent Intelligence System for Indian Market Signals. 
+Multi-Agent Intelligence System for Indian Market Signals.
 
 This system monitors corporate filings, processes them through a pipeline of intelligent agents to classify their impact, enriches them with market context, and surfaces actionable alerts to users in real-time.
 
 ## 🌟 Features
 
-- **Multi-Agent Pipeline**: Specialized agents for watching filings, classifying signals, enriching context, and composing alerts. 
+- **Multi-Agent Pipeline**: Specialized agents for watching filings, classifying signals, enriching context, and composing alerts.
 - **LLM-Powered Analysis**: Uses Gemini 2.0 to accurately classify signals and predict their market impact (with a robust rule-based fallback).
 - **Real-Time Dashboard**: A sleek dark-mode UI with live pipeline visualization and an SSE-powered alert feed.
 - **Async Message Bus**: In-memory message bus (`message_bus.py`) coordinating all agent activity based on a pub/sub pattern.
@@ -17,25 +17,26 @@ This system monitors corporate filings, processes them through a pipeline of int
 
 - Python 3.11+
 - [Optional] Google Gemini API Key
+- [Optional] Docker
 
 ### Installation
 
-1. Create a virtual environment and install dependencies:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -r requirements.txt
 ```
-*(Note: If `pip install -e .` fails due to multiple top-level packages, simply install the requirements manually or using a virtual environment package manager.)*
 
-2. (Optional) Set up your Gemini API key for LLM-powered classification:
+### Configuration
+
+Copy the env template and set your values:
 ```bash
-export GEMINI_API_KEY="your_api_key_here"
+cp .env.example .env
+# Edit .env to add your GEMINI_API_KEY (optional)
 ```
 
-### Running the Application
+### Running Locally
 
-Start the FastAPI server and agent orchestrator:
 ```bash
 python main.py
 ```
@@ -45,6 +46,34 @@ The services will be available at:
 - 📡 **REST API**: http://localhost:8000/api/alerts
 - 🔴 **SSE Stream**: http://localhost:8000/api/alerts/stream
 - 🩺 **Health**: http://localhost:8000/api/pipeline/status
+
+## 🐳 Deployment
+
+### Docker
+
+```bash
+docker build -t opportunity-radar .
+docker run -p 8000:8000 -e GEMINI_API_KEY="your_key" opportunity-radar
+```
+
+### Render / Railway / Heroku
+
+1. Push the repo to GitHub.
+2. Connect the repo to Render / Railway / Heroku.
+3. The `Procfile` will be auto-detected. Set environment variables (`GEMINI_API_KEY`, `DEMO_MODE=false`) in the platform's dashboard.
+4. Deploy.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | *(empty)* | Google Gemini API key for LLM classification |
+| `PORT` | `8000` | Server port |
+| `HOST` | `0.0.0.0` | Server bind address |
+| `DEMO_MODE` | `true` | Use sample filings (`true`) or real sources (`false`) |
+| `FILING_POLL_INTERVAL` | `900` | Seconds between filing polls |
+| `SIGNAL_THRESHOLD` | `0.65` | Minimum importance score to generate an alert |
+| `HUMAN_REVIEW_THRESHOLD` | `0.7` | Confidence below this triggers human review |
 
 ## 🏗️ Architecture
 
