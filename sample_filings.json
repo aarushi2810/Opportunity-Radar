@@ -1,0 +1,82 @@
+[
+  {
+    "source": "NSE",
+    "filing_type": "INSIDER_TRADE",
+    "company_name": "Reliance Industries Ltd",
+    "stock_symbol": "RELIANCE",
+    "title": "Insider Trade: Director acquires 50,000 shares at ₹2,450",
+    "summary": "Mukesh D. Ambani, Chairman & Managing Director, acquired 50,000 equity shares of Reliance Industries at an average price of ₹2,450 per share through market purchase on 25-Mar-2026. Total transaction value: ₹12.25 Cr. Post-transaction holding: 45.23%.",
+    "raw_text": "Name of the Company: Reliance Industries Limited\nName of Insider: Mukesh D. Ambani\nDesignation: Chairman & Managing Director\nType of Security: Equity Shares\nNo. of Securities Acquired: 50,000\nPrice per Share: ₹2,450.00\nTransaction Type: Market Purchase\nDate of Transaction: 25-Mar-2026\nPost Transaction Holding: 45.23%\nMode of Acquisition: Market Purchase",
+    "source_url": "https://www.nseindia.com/companies/corporate-filings-insider-trading"
+  },
+  {
+    "source": "SEBI",
+    "filing_type": "DRHP",
+    "company_name": "Swiggy Limited",
+    "stock_symbol": "SWIGGY",
+    "title": "DRHP Filed: Swiggy plans ₹10,000 Cr IPO with fresh issue of ₹5,000 Cr",
+    "summary": "Swiggy Limited has filed its Draft Red Herring Prospectus with SEBI for an IPO comprising a fresh issue of equity shares aggregating to ₹5,000 crore and an Offer for Sale of up to ₹5,000 crore. The company reported revenue of ₹8,264 Cr in FY26 with a net loss narrowing to ₹612 Cr from ₹2,350 Cr in FY24.",
+    "raw_text": "DRAFT RED HERRING PROSPECTUS\nIssuer: Swiggy Limited\nFresh Issue: ₹5,000 Crore\nOffer for Sale: ₹5,000 Crore\nTotal Issue Size: ₹10,000 Crore\nRevenue FY26: ₹8,264 Crore\nNet Loss FY26: ₹612 Crore\nGross Margin: 28.4%\nMonthly Active Users: 52 Million\nKey Risk: Continued operating losses, intense competition from Zomato",
+    "source_url": "https://www.sebi.gov.in/filings/drhp"
+  },
+  {
+    "source": "BSE",
+    "filing_type": "PLEDGE",
+    "company_name": "Adani Enterprises Ltd",
+    "stock_symbol": "ADANIENT",
+    "title": "Promoter Pledge: 8.2% of shares pledged by Adani family trust",
+    "summary": "S.B. Adani Family Trust has pledged 3.2 Cr equity shares (8.2% of total promoter holding) of Adani Enterprises Ltd with Punjab National Bank as collateral for a ₹15,000 Cr loan facility. Total promoter pledge now stands at 17.4% of promoter holding.",
+    "raw_text": "Name of the Company: Adani Enterprises Limited\nName of Promoter: S.B. Adani Family Trust\nType of Transaction: Creation of Pledge\nNo. of Securities Pledged: 3,20,00,000\nAs % of Total Promoter Holding: 8.2%\nReason for Pledge: Collateral for loan facility\nLender: Punjab National Bank\nLoan Amount: ₹15,000 Crore\nTotal Promoter Pledge After Transaction: 17.4%\nDate of Pledge: 24-Mar-2026",
+    "source_url": "https://www.bseindia.com/corporates/pledge.html"
+  },
+  {
+    "source": "NSE",
+    "filing_type": "BULK_DEAL",
+    "company_name": "Tata Motors Ltd",
+    "stock_symbol": "TATAMOTORS",
+    "title": "Bulk Deal: Goldman Sachs acquires 1.2% stake worth ₹2,800 Cr",
+    "summary": "Goldman Sachs Singapore PTE acquired 4.5 Cr shares (1.2% stake) of Tata Motors at ₹622 per share in a bulk deal on NSE. Total deal value: ₹2,799 Cr. This is Goldman's first significant position in Tata Motors in 3 years.",
+    "raw_text": "Bulk Deal Report - NSE\nDate: 25-Mar-2026\nCompany: Tata Motors Limited\nClient Name: Goldman Sachs Singapore PTE\nDeal Type: Buy\nQuantity: 4,50,00,000\nPrice: ₹622.00\nTotal Value: ₹2,799,00,00,000\nAs % of Equity: 1.2%\nRemarks: Fresh position",
+    "source_url": "https://www.nseindia.com/market-data/bulk-deals"
+  },
+  {
+    "source": "NSE",
+    "filing_type": "BOARD_MEETING",
+    "company_name": "Infosys Ltd",
+    "stock_symbol": "INFY",
+    "title": "Board Meeting: Special dividend of ₹32/share + buyback of ₹12,000 Cr announced",
+    "summary": "Infosys Board has approved a special dividend of ₹32 per share and a share buyback of ₹12,000 Crore via open market route. Record date for dividend: 10-Apr-2026. Buyback price cap: ₹1,800 per share. Board also revised FY27 revenue guidance upward to 4-6% CC growth.",
+    "raw_text": "Board Meeting Outcome - Infosys Limited\nDate: 25-Mar-2026\nKey Decisions:\n1. Special Dividend: ₹32 per equity share (face value ₹5)\n2. Share Buyback: ₹12,000 Crore via Open Market route\n3. Buyback Price Cap: ₹1,800 per share\n4. Record Date: April 10, 2026\n5. FY27 Revenue Guidance: 4-6% CC Growth (revised upward from 1-3%)\n6. Operating Margin Guidance: 21-23%",
+    "source_url": "https://www.nseindia.com/companies/corporate-filings-board-meetings"
+  },
+  {
+    "source": "BSE",
+    "filing_type": "QUARTERLY_RESULT",
+    "company_name": "HDFC Bank Ltd",
+    "stock_symbol": "HDFCBANK",
+    "title": "Q3 FY26 Results: PAT up 22% YoY to ₹17,250 Cr, NIM expansion of 15bps",
+    "summary": "HDFC Bank reported Q3 FY26 net profit of ₹17,250 Cr (+22% YoY, +8% QoQ). Net Interest Margin expanded 15bps YoY to 3.65%. Gross NPA at 1.24% (vs 1.34% QoQ). Loan growth at 18.2% YoY. Provisions declined 12% QoQ indicating improving asset quality.",
+    "raw_text": "Quarterly Results - HDFC Bank Limited\nQuarter: Q3 FY26 (Oct-Dec 2025)\nNet Profit: ₹17,250 Crore (+22% YoY)\nNet Interest Income: ₹31,420 Crore (+19% YoY)\nNIM: 3.65% (+15bps YoY)\nGross NPA: 1.24% (vs 1.34% previous quarter)\nNet NPA: 0.31%\nCredit Growth: 18.2% YoY\nDeposit Growth: 21.4% YoY\nProvisions: ₹2,850 Crore (-12% QoQ)\nROA: 2.05%\nROE: 17.8%",
+    "source_url": "https://www.bseindia.com/corporates/results.html"
+  },
+  {
+    "source": "SEBI",
+    "filing_type": "SHAREHOLDING",
+    "company_name": "ITC Ltd",
+    "stock_symbol": "ITC",
+    "title": "FII Holding: Foreign investors increase stake to 42.3% — highest in 5 years",
+    "summary": "SEBI shareholding pattern filing shows FII/FPI holding in ITC increased to 42.3% in Q3 FY26, up from 38.1% in Q2 FY26. This represents the highest foreign ownership in 5 years. Domestic mutual fund holding declined from 18.2% to 15.8% in the same period.",
+    "raw_text": "Shareholding Pattern - ITC Limited\nQuarter: Q3 FY26\nPromoter: 0.00% (unchanged)\nFII/FPI: 42.3% (up from 38.1%)\nDomestic MF: 15.8% (down from 18.2%)\nDII: 22.1% (down from 24.5%)\nRetail: 19.8% (up from 19.2%)\nChange in FII: +4.2% — largest quarterly increase since 2021\nNotable FII buyers: Vanguard, BlackRock, GIC Singapore",
+    "source_url": "https://www.sebi.gov.in/filings/shareholding"
+  },
+  {
+    "source": "NSE",
+    "filing_type": "CORPORATE_ACTION",
+    "company_name": "Bajaj Finance Ltd",
+    "stock_symbol": "BAJFINANCE",
+    "title": "Stock Split: 1:5 split approved, face value from ₹10 to ₹2",
+    "summary": "Bajaj Finance has approved a stock split in the ratio of 1:5 (face value from ₹10 to ₹2 per share). Record date: 15-Apr-2026. Current price ~₹7,200/share implies post-split price of ~₹1,440. Board cited improving retail participation as rationale.",
+    "raw_text": "Corporate Action - Bajaj Finance Limited\nDate of Announcement: 25-Mar-2026\nAction Type: Stock Split\nSplit Ratio: 1:5\nFace Value Before: ₹10\nFace Value After: ₹2\nRecord Date: April 15, 2026\nBoard Resolution Date: March 25, 2026\nRationale: Improve liquidity and retail participation\nCurrent Market Price: ₹7,200 (approx.)\nEstimated Post-Split Price: ₹1,440 (approx.)",
+    "source_url": "https://www.nseindia.com/companies/corporate-filings-actions"
+  }
+]
