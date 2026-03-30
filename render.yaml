@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: opportunity-radar
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DEMO_MODE
+        value: "true"
+      - key: PORT
+        value: "8000"
+      - key: HOST
+        value: "0.0.0.0"
