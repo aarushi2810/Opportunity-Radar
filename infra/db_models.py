@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     Integer,
+    JSON,
     String,
     Text,
     func,
@@ -17,12 +18,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from infra.database import Base
 
-try:
-    from sqlalchemy.dialects.postgresql import JSONB
-    _JSON = JSONB
-except ImportError:
-    from sqlalchemy import JSON
-    _JSON = JSON
+# Use JSON column type — compatible with both SQLite and PostgreSQL.
+# On Postgres, SQLAlchemy will use JSONB semantics when available.
+_JSON = JSON
 
 
 class UserModel(Base):
