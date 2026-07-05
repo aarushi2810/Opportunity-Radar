@@ -21,9 +21,10 @@ SAMPLE_FILINGS_PATH = Path(__file__).parent.parent / "data" / "sample_filings.js
 
 
 class FilingWatcherAgent:
-    """Polls SEBI EDGAR, NSE/BSE APIs for new filings every 15 min.
-    Extracts delta changes vs last filing using content hash comparison.
-    In demo mode, cycles through sample filings with randomized timing.
+    """Polls SEBI EDGAR, NSE/BSE APIs for new filings every 15 minutes.
+
+    Extracts delta changes via content hash comparison.
+    In demo mode, cycles through sample filings with randomised timing.
     """
 
     def __init__(self):
@@ -39,9 +40,9 @@ class FilingWatcherAgent:
         try:
             with open(SAMPLE_FILINGS_PATH) as f:
                 self._sample_filings = json.load(f)
-            logger.info(f"Loaded {len(self._sample_filings)} sample filings")
-        except Exception as e:
-            logger.error(f"Failed to load sample filings: {e}")
+            logger.info("Loaded %d sample filings", len(self._sample_filings))
+        except Exception as exc:
+            logger.error("Failed to load sample filings: %s", exc)
             self._sample_filings = []
 
     @staticmethod
@@ -75,26 +76,24 @@ class FilingWatcherAgent:
             logger.warning("No sample filings available")
             return new_filings
 
-        # In demo mode, emit 1-2 filings per poll cycle
         num_to_emit = random.randint(1, 2)
         for _ in range(num_to_emit):
             if self._filing_index >= len(self._sample_filings):
-                self._filing_index = 0  # Cycle back
+                self._filing_index = 0
 
             data = self._sample_filings[self._filing_index]
             self._filing_index += 1
 
             content_hash = self._compute_hash(data)
 
-            # Delta check — skip if already seen
             if content_hash in self._seen_hashes:
-                logger.debug(f"Skipping duplicate filing: {data['title'][:50]}")
+                logger.debug("Skipping duplicate filing: %s", data["title"][:50])
                 continue
 
             self._seen_hashes.add(content_hash)
             filing = self._to_raw_filing(data)
             new_filings.append(filing)
-            logger.info(f"📄 New filing detected: [{filing.source}] {filing.title[:60]}")
+            logger.info("New filing detected: [%s] %s", filing.source, filing.title[:60])
 
         self._status = "idle"
         return new_filings
@@ -104,12 +103,12 @@ class FilingWatcherAgent:
         for filing in filings:
             await bus.publish("raw_filings", filing)
             self._total_processed += 1
-            logger.info(f"📤 Emitted to raw_filings: {filing.stock_symbol} — {filing.filing_type.value}")
+            logger.info("Emitted to raw_filings: %s — %s", filing.stock_symbol, filing.filing_type.value)
 
     async def run(self):
         """Main polling loop with exponential backoff on failures."""
         poll_interval = config.DEMO_POLL_INTERVAL_SEC if config.DEMO_MODE else config.FILING_POLL_INTERVAL_SEC
-        logger.info(f"🔍 Filing Watcher started (poll interval: {poll_interval}s, demo: {config.DEMO_MODE})")
+        logger.info("Filing Watcher started (poll interval: %ds, demo: %s)", poll_interval, config.DEMO_MODE)
         self._status = "running"
 
         while True:
@@ -117,21 +116,21 @@ class FilingWatcherAgent:
                 filings = await self._poll_once()
                 if filings:
                     await self._emit_filings(filings)
-                    self._retry_counts.clear()  # Reset on success
+                    self._retry_counts.clear()
                 else:
                     logger.debug("No new filings found this cycle")
 
-            except Exception as e:
+            except Exception as exc:
                 source = "polling"
                 count = self._retry_counts.get(source, 0) + 1
                 self._retry_counts[source] = count
 
                 if count > config.MAX_RETRIES:
-                    logger.error(f"💀 Dead-letter: polling failed {count} times: {e}")
+                    logger.error("Max retries exceeded for polling (%d attempts): %s", count, exc)
                     self._retry_counts[source] = 0
                 else:
                     delay = config.RETRY_DELAYS[min(count - 1, len(config.RETRY_DELAYS) - 1)]
-                    logger.warning(f"⚠️ Retry {count}/{config.MAX_RETRIES} in {delay}s: {e}")
+                    logger.warning("Retry %d/%d in %ds: %s", count, config.MAX_RETRIES, delay, exc)
                     await asyncio.sleep(delay)
                     continue
 
