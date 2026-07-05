@@ -59,7 +59,7 @@ Respond ONLY with valid JSON:
 
 
 class SignalClassifierAgent:
-    """Scores filings on 5 dimensions using LLM or rule-based fallback."""
+    """Scores filings on 5 dimensions using Gemini LLM or rule-based fallback."""
 
     def __init__(self):
         self._status = "idle"
@@ -68,11 +68,11 @@ class SignalClassifierAgent:
         if HAS_GEMINI:
             try:
                 self._model = genai.GenerativeModel("gemini-2.0-flash")
-                logger.info("🤖 Signal Classifier using Gemini LLM")
-            except Exception as e:
-                logger.warning(f"Gemini init failed, using rule-based: {e}")
+                logger.info("Signal Classifier using Gemini LLM")
+            except Exception as exc:
+                logger.warning("Gemini init failed, using rule-based: %s", exc)
         else:
-            logger.info("🧮 Signal Classifier using rule-based classification")
+            logger.info("Signal Classifier using rule-based classification")
 
     def _rule_based_classify(self, filing: RawFiling) -> dict:
         """Rule-based classification fallback when LLM is unavailable."""
@@ -87,71 +87,89 @@ class SignalClassifierAgent:
             "reasoning": ""
         }
 
-        # Filing type heuristics
         ft = filing.filing_type.value
         if ft == "INSIDER_TRADE":
-            scores["magnitude"] = 0.75
-            scores["insider_credibility"] = 0.85
-            scores["timing"] = 0.8
-            scores["signal_type"] = "BULLISH"
-            scores["tags"] = ["insider-buy", "promoter-activity", "high-conviction"]
-            scores["reasoning"] = f"Insider trade by senior management at {filing.company_name} indicates high conviction. Historically, insider buys by promoters precede 60%+ positive moves within 90 days."
+            scores.update({
+                "magnitude": 0.75, "insider_credibility": 0.85, "timing": 0.8,
+                "signal_type": "BULLISH",
+                "tags": ["insider-buy", "promoter-activity", "high-conviction"],
+                "reasoning": (
+                    f"Insider trade by senior management at {filing.company_name} indicates high conviction. "
+                    "Historically, insider buys by promoters precede 60%+ positive moves within 90 days."
+                ),
+            })
         elif ft == "DRHP":
-            scores["magnitude"] = 0.7
-            scores["insider_credibility"] = 0.6
-            scores["timing"] = 0.65
-            scores["sector_momentum"] = 0.7
-            scores["signal_type"] = "WATCH"
-            scores["tags"] = ["ipo", "new-listing", "growth-stage"]
-            scores["reasoning"] = f"DRHP filing for {filing.company_name} signals upcoming IPO. Revenue trajectory and competitive positioning are key watch factors."
+            scores.update({
+                "magnitude": 0.7, "insider_credibility": 0.6, "timing": 0.65, "sector_momentum": 0.7,
+                "signal_type": "WATCH",
+                "tags": ["ipo", "new-listing", "growth-stage"],
+                "reasoning": (
+                    f"DRHP filing for {filing.company_name} signals upcoming IPO. "
+                    "Revenue trajectory and competitive positioning are key watch factors."
+                ),
+            })
         elif ft == "PLEDGE":
-            scores["magnitude"] = 0.8
-            scores["insider_credibility"] = 0.7
-            scores["timing"] = 0.75
-            scores["signal_type"] = "BEARISH"
-            scores["tags"] = ["promoter-pledge", "leverage-risk", "governance-concern"]
-            scores["reasoning"] = f"Significant promoter pledge increase at {filing.company_name}. Rising pledge levels historically correlate with governance risk and potential forced selling."
+            scores.update({
+                "magnitude": 0.8, "insider_credibility": 0.7, "timing": 0.75,
+                "signal_type": "BEARISH",
+                "tags": ["promoter-pledge", "leverage-risk", "governance-concern"],
+                "reasoning": (
+                    f"Significant promoter pledge increase at {filing.company_name}. "
+                    "Rising pledge levels historically correlate with governance risk and potential forced selling."
+                ),
+            })
         elif ft == "BULK_DEAL":
-            scores["magnitude"] = 0.7
-            scores["insider_credibility"] = 0.75
-            scores["timing"] = 0.7
-            scores["sector_momentum"] = 0.65
-            scores["signal_type"] = "BULLISH"
-            scores["tags"] = ["institutional-buy", "block-deal", "fii-activity"]
-            scores["reasoning"] = f"Major institutional bulk deal in {filing.company_name}. Large block purchases by reputed institutions signal institutional conviction."
+            scores.update({
+                "magnitude": 0.7, "insider_credibility": 0.75, "timing": 0.7, "sector_momentum": 0.65,
+                "signal_type": "BULLISH",
+                "tags": ["institutional-buy", "block-deal", "fii-activity"],
+                "reasoning": (
+                    f"Major institutional bulk deal in {filing.company_name}. "
+                    "Large block purchases by reputed institutions signal institutional conviction."
+                ),
+            })
         elif ft == "BOARD_MEETING":
-            scores["magnitude"] = 0.85
-            scores["insider_credibility"] = 0.8
-            scores["timing"] = 0.9
-            scores["signal_type"] = "BULLISH"
-            scores["tags"] = ["dividend", "buyback", "capital-return", "guidance-upgrade"]
-            scores["reasoning"] = f"Board meeting outcome at {filing.company_name} with significant capital return and guidance upgrade. Buyback + special dividend combination is historically very bullish."
+            scores.update({
+                "magnitude": 0.85, "insider_credibility": 0.8, "timing": 0.9,
+                "signal_type": "BULLISH",
+                "tags": ["dividend", "buyback", "capital-return", "guidance-upgrade"],
+                "reasoning": (
+                    f"Board meeting outcome at {filing.company_name} with significant capital return. "
+                    "Buyback combined with special dividend is historically very bullish."
+                ),
+            })
         elif ft == "QUARTERLY_RESULT":
-            scores["magnitude"] = 0.75
-            scores["insider_credibility"] = 0.7
-            scores["timing"] = 0.85
-            scores["sector_momentum"] = 0.7
-            scores["signal_type"] = "BULLISH"
-            scores["tags"] = ["earnings-beat", "margin-expansion", "asset-quality"]
-            scores["reasoning"] = f"Strong quarterly results from {filing.company_name} with profit growth and margin expansion. Improving fundamentals support re-rating thesis."
+            scores.update({
+                "magnitude": 0.75, "insider_credibility": 0.7, "timing": 0.85, "sector_momentum": 0.7,
+                "signal_type": "BULLISH",
+                "tags": ["earnings-beat", "margin-expansion", "asset-quality"],
+                "reasoning": (
+                    f"Strong quarterly results from {filing.company_name} with profit growth and margin expansion. "
+                    "Improving fundamentals support a re-rating thesis."
+                ),
+            })
         elif ft == "SHAREHOLDING":
-            scores["magnitude"] = 0.65
-            scores["insider_credibility"] = 0.6
-            scores["timing"] = 0.6
-            scores["sector_momentum"] = 0.75
-            scores["historical_match"] = 0.7
-            scores["signal_type"] = "BULLISH"
-            scores["tags"] = ["fii-increase", "ownership-shift", "smart-money"]
-            scores["reasoning"] = f"Significant FII ownership increase in {filing.company_name}. Rising foreign ownership often precedes sustained re-rating."
+            scores.update({
+                "magnitude": 0.65, "insider_credibility": 0.6, "timing": 0.6,
+                "sector_momentum": 0.75, "historical_match": 0.7,
+                "signal_type": "BULLISH",
+                "tags": ["fii-increase", "ownership-shift", "smart-money"],
+                "reasoning": (
+                    f"Significant FII ownership increase in {filing.company_name}. "
+                    "Rising foreign ownership often precedes sustained re-rating."
+                ),
+            })
         elif ft == "CORPORATE_ACTION":
-            scores["magnitude"] = 0.6
-            scores["insider_credibility"] = 0.7
-            scores["timing"] = 0.65
-            scores["signal_type"] = "BULLISH"
-            scores["tags"] = ["stock-split", "liquidity-event", "retail-access"]
-            scores["reasoning"] = f"Stock split at {filing.company_name} improves retail accessibility. Historically, splits in quality stocks see positive price action post-adjustment."
+            scores.update({
+                "magnitude": 0.6, "insider_credibility": 0.7, "timing": 0.65,
+                "signal_type": "BULLISH",
+                "tags": ["stock-split", "liquidity-event", "retail-access"],
+                "reasoning": (
+                    f"Stock split at {filing.company_name} improves retail accessibility. "
+                    "Historically, splits in quality stocks see positive price action post-adjustment."
+                ),
+            })
 
-        # Add small random variation for realism
         for key in ["magnitude", "insider_credibility", "timing", "sector_momentum", "historical_match"]:
             scores[key] = round(min(1.0, max(0.0, scores[key] + random.uniform(-0.1, 0.1))), 2)
 
@@ -172,25 +190,21 @@ class SignalClassifierAgent:
         )
 
         try:
-            response = await asyncio.to_thread(
-                self._model.generate_content, prompt
-            )
+            response = await asyncio.to_thread(self._model.generate_content, prompt)
             text = response.text.strip()
-            # Strip markdown code fences if present
             if text.startswith("```"):
                 text = text.split("\n", 1)[1]
                 text = text.rsplit("```", 1)[0]
             return json.loads(text)
-        except Exception as e:
-            logger.warning(f"LLM classification failed: {e}")
+        except Exception as exc:
+            logger.warning("LLM classification failed: %s", exc)
             return None
 
     async def classify(self, filing: RawFiling) -> ClassifiedSignal:
-        """Classify a filing and return structured signal."""
+        """Classify a filing and return a structured signal."""
         self._status = "classifying"
-        logger.info(f"🔬 Classifying: [{filing.filing_type.value}] {filing.company_name}")
+        logger.info("Classifying: [%s] %s", filing.filing_type.value, filing.company_name)
 
-        # Try LLM first, fall back to rule-based
         result = await self._llm_classify(filing)
         if result is None:
             result = self._rule_based_classify(filing)
@@ -203,14 +217,13 @@ class SignalClassifierAgent:
             historical_match=result.get("historical_match", 0.5),
         )
 
-        # Compute overall importance as weighted average
         importance_score = round(
-            dimension_scores.magnitude * 0.25 +
-            dimension_scores.insider_credibility * 0.20 +
-            dimension_scores.timing * 0.25 +
-            dimension_scores.sector_momentum * 0.15 +
-            dimension_scores.historical_match * 0.15,
-            3
+            dimension_scores.magnitude * 0.25
+            + dimension_scores.insider_credibility * 0.20
+            + dimension_scores.timing * 0.25
+            + dimension_scores.sector_momentum * 0.15
+            + dimension_scores.historical_match * 0.15,
+            3,
         )
 
         signal_type_str = result.get("signal_type", "WATCH")
@@ -231,10 +244,9 @@ class SignalClassifierAgent:
 
         self._total_classified += 1
         self._status = "idle"
-
         logger.info(
-            f"📊 Classified: {filing.stock_symbol} → {signal.signal_type.value} "
-            f"(score: {signal.importance_score:.2f})"
+            "Classified: %s -> %s (score: %.2f)",
+            filing.stock_symbol, signal.signal_type.value, signal.importance_score,
         )
         return signal
 
