@@ -247,6 +247,15 @@ async def get_users():
     return JSONResponse(content={"users": [u.model_dump(mode="json") for u in users]})
 
 
+@app.get("/api/watchlist")
+async def get_watchlist(user_id: str = Depends(get_current_user_id)):
+    """Return the authenticated user's watchlist."""
+    user = await user_store.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return JSONResponse(content={"watchlist": user.watchlist, "user": user.model_dump(mode="json")})
+
+
 @app.post("/api/watchlist")
 async def update_watchlist(
     request: Request,
@@ -254,7 +263,19 @@ async def update_watchlist(
 ):
     """Update the authenticated user's watchlist."""
     data = await request.json()
-    watchlist = data.get("watchlist", [])
+    raw_watchlist = data.get("watchlist", [])
+    if not isinstance(raw_watchlist, list):
+        raise HTTPException(status_code=400, detail="watchlist must be a list")
+
+    watchlist = []
+    seen = set()
+    for item in raw_watchlist:
+        symbol = str(item).strip().upper()
+        if not symbol or symbol in seen:
+            continue
+        seen.add(symbol)
+        watchlist.append(symbol[:24])
+
     await user_store.update_watchlist(user_id, watchlist)
     return JSONResponse(content={"success": True, "watchlist": watchlist})
 
