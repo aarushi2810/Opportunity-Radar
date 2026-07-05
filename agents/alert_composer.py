@@ -13,7 +13,6 @@ from message_bus import bus
 
 logger = logging.getLogger("opportunity_radar.alert_composer")
 
-# Try Gemini for alert generation
 try:
     import google.generativeai as genai
     HAS_GEMINI = bool(config.GEMINI_API_KEY)
@@ -38,8 +37,8 @@ Summary: {summary}
 Impact Analysis: {impact_analysis}
 
 Market Context:
-- Price: ₹{price} (1D: {change_1d}%, 1W: {change_1w}%, 1M: {change_1m}%)
-- PE: {pe}x | EPS: ₹{eps} | MCap: ₹{mcap} Cr
+- Price: Rs {price} (1D: {change_1d}%, 1W: {change_1w}%, 1M: {change_1m}%)
+- PE: {pe}x | EPS: Rs {eps} | MCap: Rs {mcap} Cr
 - Sector: {sector}
 
 Generate a 3-4 sentence alert that:
@@ -51,7 +50,6 @@ Generate a 3-4 sentence alert that:
 Keep it under 300 words. Do NOT use "buy", "sell", or "recommend"."""
 
 
-# Historical base rates for alert context
 BASE_RATES = {
     "INSIDER_TRADE": "72% of similar insider buys saw 5%+ appreciation in 30 days",
     "DRHP": "65% of recent tech IPOs listed at 10%+ premium to issue price",
@@ -61,6 +59,16 @@ BASE_RATES = {
     "QUARTERLY_RESULT": "75% of earnings beats with margin expansion led to analyst upgrades",
     "SHAREHOLDING": "70% of stocks with FII increase >3% outperformed Nifty in next quarter",
     "CORPORATE_ACTION": "63% of stock splits in large-caps saw 8%+ appreciation in 6 months",
+}
+
+# Clean risk flag text — no emojis
+RISK_FLAG_MESSAGES = {
+    "stale_data": "Stale data — source >4 hrs old",
+    "bearish_signal": "Bearish signal — elevated downside risk",
+    "high_valuation": "High valuation — PE >50x",
+    "loss_making": "Loss-making company — negative PE",
+    "promoter_pledge": "Promoter pledge detected — governance risk",
+    "high_impact": "High-impact signal — monitor closely",
 }
 
 
@@ -74,12 +82,11 @@ class AlertComposerAgent:
         if HAS_GEMINI:
             try:
                 self._model = genai.GenerativeModel("gemini-2.0-flash")
-                logger.info("📝 Alert Composer using Gemini for alert generation")
+                logger.info("Alert Composer using Gemini for alert generation")
             except Exception:
                 pass
 
     def _determine_priority(self, enriched: EnrichedSignal) -> AlertPriority:
-        """Determine alert priority based on signal characteristics."""
         score = enriched.signal.importance_score
         if score >= 0.85:
             return AlertPriority.CRITICAL
@@ -90,54 +97,50 @@ class AlertComposerAgent:
         return AlertPriority.LOW
 
     def _compute_confidence(self, enriched: EnrichedSignal) -> float:
-        """Compute confidence score from dimension scores and data freshness."""
         ds = enriched.signal.dimension_scores
         base_confidence = (
-            ds.magnitude * 0.2 +
-            ds.insider_credibility * 0.25 +
-            ds.timing * 0.2 +
-            ds.sector_momentum * 0.15 +
-            ds.historical_match * 0.2
+            ds.magnitude * 0.2
+            + ds.insider_credibility * 0.25
+            + ds.timing * 0.2
+            + ds.sector_momentum * 0.15
+            + ds.historical_match * 0.2
         )
-        # Penalize stale data
         if enriched.filing.data_freshness_ms > config.DATA_FRESHNESS_MAX_MS:
             base_confidence *= 0.7
         return round(min(1.0, base_confidence + random.uniform(-0.05, 0.05)), 2)
 
     def _identify_risk_flags(self, enriched: EnrichedSignal) -> list[str]:
-        """Identify risk flags for the alert."""
         flags = []
         filing = enriched.filing
         signal = enriched.signal
 
         if filing.data_freshness_ms > config.DATA_FRESHNESS_MAX_MS:
-            flags.append("⚠️ Stale data — source >4 hrs old")
+            flags.append(RISK_FLAG_MESSAGES["stale_data"])
         if signal.signal_type == SignalType.BEARISH:
-            flags.append("🔴 Bearish signal — elevated downside risk")
+            flags.append(RISK_FLAG_MESSAGES["bearish_signal"])
         if enriched.pe_ratio > 50:
-            flags.append("📈 High valuation — PE >50x")
+            flags.append(RISK_FLAG_MESSAGES["high_valuation"])
         if enriched.pe_ratio < 0:
-            flags.append("💸 Loss-making company — negative PE")
+            flags.append(RISK_FLAG_MESSAGES["loss_making"])
         if "pledge" in filing.filing_type.value.lower():
-            flags.append("🔒 Promoter pledge detected — governance risk")
+            flags.append(RISK_FLAG_MESSAGES["promoter_pledge"])
         if signal.importance_score >= 0.85:
-            flags.append("🔥 High-impact signal — monitor closely")
+            flags.append(RISK_FLAG_MESSAGES["high_impact"])
 
         return flags
 
     def _generate_rule_based_alert(self, enriched: EnrichedSignal) -> str:
-        """Generate alert body using rules."""
         filing = enriched.filing
         signal = enriched.signal
         ft = filing.filing_type.value
         base_rate = BASE_RATES.get(ft, "Historical data limited for this signal type")
 
         parts = [
-            f"📡 Signal detected: {filing.title}.",
-            f"",
-            f"{enriched.impact_analysis}",
-            f"",
-            f"📊 Historical base rate: {base_rate}.",
+            f"Signal detected: {filing.title}.",
+            "",
+            enriched.impact_analysis,
+            "",
+            f"Historical base rate: {base_rate}.",
         ]
 
         if enriched.peers:
@@ -147,7 +150,6 @@ class AlertComposerAgent:
         return "\n".join(parts)
 
     async def _generate_llm_alert(self, enriched: EnrichedSignal) -> str | None:
-        """Generate alert using Gemini."""
         if not self._model:
             return None
 
@@ -175,12 +177,10 @@ class AlertComposerAgent:
         )
 
         try:
-            response = await asyncio.to_thread(
-                self._model.generate_content, prompt
-            )
+            response = await asyncio.to_thread(self._model.generate_content, prompt)
             return response.text.strip()
-        except Exception as e:
-            logger.warning(f"LLM alert generation failed: {e}")
+        except Exception as exc:
+            logger.warning("LLM alert generation failed: %s", exc)
             return None
 
     async def compose(self, enriched: EnrichedSignal) -> Alert:
@@ -189,9 +189,8 @@ class AlertComposerAgent:
         filing = enriched.filing
         signal = enriched.signal
 
-        logger.info(f"📝 Composing alert: {filing.stock_symbol} ({signal.signal_type.value})")
+        logger.info("Composing alert: %s (%s)", filing.stock_symbol, signal.signal_type.value)
 
-        # Generate alert body
         body = await self._generate_llm_alert(enriched)
         if body is None:
             body = self._generate_rule_based_alert(enriched)
@@ -201,7 +200,7 @@ class AlertComposerAgent:
         risk_flags = self._identify_risk_flags(enriched)
         base_rate = BASE_RATES.get(
             filing.filing_type.value,
-            "Limited historical data for this pattern"
+            "Limited historical data for this pattern",
         )
 
         alert = Alert(
@@ -225,8 +224,8 @@ class AlertComposerAgent:
         self._total_alerts += 1
         self._status = "idle"
         logger.info(
-            f"🔔 Alert composed: {alert.title[:60]}... "
-            f"(confidence: {alert.confidence_score:.0%}, priority: {alert.priority.value})"
+            "Alert composed: %s (confidence: %.0f%%, priority: %s)",
+            alert.title[:60], alert.confidence_score * 100, alert.priority.value,
         )
         return alert
 
