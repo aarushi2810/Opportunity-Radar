@@ -26,6 +26,9 @@
         seenAlertIds: new Set(),
         signalCounts: { BULLISH: 0, BEARISH: 0, WATCH: 0, NEUTRAL: 0 },
         connected: false,
+        filtersActive: false,
+        eventSource: null,
+        watchlist: [],
     };
 
     // ── DOM ──────────────────────────────────────────────────────────────────
@@ -33,6 +36,14 @@
     const alertsFeed = $('alertsFeed');
     const emptyState = $('emptyState');
     const alertCountBadge = $('alertCount');
+
+    function showMessage(targetId, message, type = 'info') {
+        const el = $(targetId);
+        if (!el) return;
+        el.textContent = message;
+        el.className = `inline-message ${type}`;
+        el.style.display = message ? 'block' : 'none';
+    }
 
     // ── Auth UI ──────────────────────────────────────────────────────────────
     window.openAuthModal = function (mode) {
@@ -99,9 +110,10 @@
             localStorage.setItem('or_user', JSON.stringify(data.user));
             updateAuthUI();
             closeAuthModal();
-            loadWatchlist();
+            await loadWatchlist();
+            reconnectSSE();
         } catch (err) {
-            errEl.textContent = 'Network error — please try again';
+            errEl.textContent = 'Network error. Please try again.';
             errEl.style.display = 'block';
         } finally {
             btn.disabled = false;
@@ -114,7 +126,10 @@
         auth.user = null;
         localStorage.removeItem('or_token');
         localStorage.removeItem('or_user');
+        state.watchlist = [];
         updateAuthUI();
+        loadWatchlist();
+        reconnectSSE();
     };
 
     function updateAuthUI() {
@@ -141,9 +156,11 @@
         const symbol = ($('filterSymbol').value || '').trim().toUpperCase();
         const signal = $('filterSignal').value;
         const priority = $('filterPriority').value;
+        state.filtersActive = Boolean(symbol || signal || priority);
 
         state.filteredAlerts = state.alerts.filter((a) => {
-            if (symbol && !a.stock_symbol.includes(symbol)) return false;
+            const haystack = `${a.stock_symbol || ''} ${a.company_name || ''}`.toUpperCase();
+            if (symbol && !haystack.includes(symbol)) return false;
             if (signal && a.signal_type !== signal) return false;
             if (priority && a.priority !== priority) return false;
             return true;
@@ -156,15 +173,22 @@
         $('filterSymbol').value = '';
         $('filterSignal').value = '';
         $('filterPriority').value = '';
+        state.filtersActive = false;
         state.filteredAlerts = [...state.alerts];
         rebuildFeed();
     };
 
     function rebuildFeed() {
         alertsFeed.innerHTML = '';
-        const toShow = state.filteredAlerts.length ? state.filteredAlerts : state.alerts;
+        const toShow = state.filtersActive ? state.filteredAlerts : state.alerts;
         if (toShow.length === 0) {
             emptyState.style.display = 'block';
+            emptyState.querySelector('.empty-state-title').textContent = state.filtersActive
+                ? 'No matching alerts'
+                : 'Scanning for signals...';
+            emptyState.querySelector('.empty-state-text').textContent = state.filtersActive
+                ? 'Try a different symbol, signal type, or priority.'
+                : 'The Filing Watcher is polling SEBI, NSE and BSE for new filings. Alerts will appear here in real time.';
             alertsFeed.appendChild(emptyState);
         } else {
             emptyState.style.display = 'none';
@@ -176,10 +200,12 @@
 
     // ── SSE Connection ───────────────────────────────────────────────────────
     function connectSSE() {
+        if (state.eventSource) state.eventSource.close();
         const url = auth.token
             ? `/api/alerts/stream?token=${encodeURIComponent(auth.token)}`
             : '/api/alerts/stream';
         const es = new EventSource(url);
+        state.eventSource = es;
 
         es.addEventListener('alert', (e) => {
             try {
@@ -187,8 +213,7 @@
                 if (!state.seenAlertIds.has(alert.id)) {
                     state.seenAlertIds.add(alert.id);
                     state.alerts.unshift(alert);
-                    state.filteredAlerts.unshift(alert);
-                    renderAlert(alert, true);
+                    applyFilters();
                     updateSignalCounts(alert);
                 }
             } catch (err) {
@@ -221,26 +246,38 @@
         };
     }
 
+    function reconnectSSE() {
+        connectSSE();
+    }
+
     // ── Initial Load ─────────────────────────────────────────────────────────
     async function loadInitialAlerts() {
+        alertsFeed.classList.add('is-loading');
         try {
             const res = await fetch('/api/alerts', { headers: authHeaders() });
             const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Could not load alerts');
             if (data.alerts && data.alerts.length > 0) {
                 emptyState.style.display = 'none';
                 data.alerts.forEach((alert) => {
                     if (!state.seenAlertIds.has(alert.id)) {
                         state.seenAlertIds.add(alert.id);
                         state.alerts.push(alert);
-                        state.filteredAlerts.push(alert);
                         renderAlert(alert, false);
                         updateSignalCounts(alert);
                     }
                 });
+                state.filteredAlerts = [...state.alerts];
                 if (window.lucide) lucide.createIcons();
             }
         } catch (err) {
             console.warn('Could not load initial alerts:', err);
+            emptyState.style.display = 'block';
+            emptyState.querySelector('.empty-state-title').textContent = 'Could not load alerts';
+            emptyState.querySelector('.empty-state-text').textContent = err.message || 'Refresh the page or try again shortly.';
+        } finally {
+            alertsFeed.classList.remove('is-loading');
+            rebuildFeed();
         }
     }
 
@@ -321,13 +358,13 @@
                 <span class="confidence-label" style="color: ${confColor}">${confidencePct}%</span>
             </div>
             <div class="alert-actions">
-                <button class="alert-action-btn" onclick="submitFeedback('${alert.id}', 'DISMISS')">
+                <button class="alert-action-btn" onclick="submitFeedback('${alert.id}', 'DISMISS', this)">
                     <i data-lucide="x" style="width:12px;height:12px;"></i> Dismiss
                 </button>
-                <button class="alert-action-btn watch-btn" onclick="submitFeedback('${alert.id}', 'WATCH')">
+                <button class="alert-action-btn watch-btn" onclick="submitFeedback('${alert.id}', 'WATCH', this)">
                     <i data-lucide="eye" style="width:12px;height:12px;"></i> Watch
                 </button>
-                <button class="alert-action-btn buy-btn" onclick="submitFeedback('${alert.id}', 'BUY_SIGNAL')">
+                <button class="alert-action-btn buy-btn" onclick="submitFeedback('${alert.id}', 'BUY_SIGNAL', this)">
                     <i data-lucide="bookmark" style="width:12px;height:12px;"></i> Signal
                 </button>
             </div>
@@ -393,29 +430,57 @@
     }
 
     // ── Watchlist ────────────────────────────────────────────────────────────
+    const watchlistStocks = {
+        RELIANCE: { name: 'Reliance Industries', price: 'Rs 2,480', change: '+1.44%', positive: true },
+        INFY: { name: 'Infosys', price: 'Rs 1,685', change: '+0.88%', positive: true },
+        HDFCBANK: { name: 'HDFC Bank', price: 'Rs 1,725', change: '+1.02%', positive: true },
+        TATAMOTORS: { name: 'Tata Motors', price: 'Rs 628', change: '+1.65%', positive: true },
+        ITC: { name: 'ITC', price: 'Rs 468', change: '+1.23%', positive: true },
+        ADANIENT: { name: 'Adani Enterprises', price: 'Rs 2,650', change: '-2.23%', positive: false },
+        BAJFINANCE: { name: 'Bajaj Finance', price: 'Rs 7,215', change: '+0.91%', positive: true },
+        SWIGGY: { name: 'Swiggy', price: 'Rs 412', change: '+1.60%', positive: true },
+        ZOMATO: { name: 'Zomato', price: 'Rs 182', change: '+2.35%', positive: true },
+    };
+
     async function loadWatchlist() {
+        const container = $('watchlistBody');
+        if (!container) return;
+        container.innerHTML = '<div class="loading-row">Loading watchlist...</div>';
+        showMessage('watchlistMessage', '', 'info');
+
         try {
-            const res = await fetch('/api/users', { headers: authHeaders() });
+            const res = auth.token
+                ? await fetch('/api/watchlist', { headers: authHeaders() })
+                : await fetch('/api/users', { headers: authHeaders() });
             const data = await res.json();
-            const user = auth.user
-                ? data.users?.find((u) => u.id === auth.user.id) || data.users?.[0]
-                : data.users?.[0];
-            if (!user) return;
+            if (!res.ok) throw new Error(data.detail || 'Could not load watchlist');
 
-            const container = $('watchlistBody');
-            const watchlistStocks = {
-                RELIANCE: { name: 'Reliance Industries', price: 'Rs 2,480', change: '+1.44%', positive: true },
-                INFY: { name: 'Infosys', price: 'Rs 1,685', change: '+0.88%', positive: true },
-                HDFCBANK: { name: 'HDFC Bank', price: 'Rs 1,725', change: '+1.02%', positive: true },
-                TATAMOTORS: { name: 'Tata Motors', price: 'Rs 628', change: '+1.65%', positive: true },
-                ITC: { name: 'ITC', price: 'Rs 468', change: '+1.23%', positive: true },
-                ADANIENT: { name: 'Adani Enterprises', price: 'Rs 2,650', change: '-2.23%', positive: false },
-                BAJFINANCE: { name: 'Bajaj Finance', price: 'Rs 7,215', change: '+0.91%', positive: true },
-                SWIGGY: { name: 'Swiggy', price: 'Rs 412', change: '+1.60%', positive: true },
-                ZOMATO: { name: 'Zomato', price: 'Rs 182', change: '+2.35%', positive: true },
-            };
+            const user = auth.token ? data.user : data.users?.[0];
+            state.watchlist = [...(data.watchlist || user?.watchlist || [])];
+            renderWatchlist();
+        } catch (err) {
+            console.warn('Watchlist load error:', err);
+            container.innerHTML = '';
+            showMessage('watchlistMessage', err.message || 'Could not load watchlist.', 'error');
+        }
+    }
 
-            container.innerHTML = user.watchlist.map((sym) => {
+    function renderWatchlist() {
+        const container = $('watchlistBody');
+        if (!container) return;
+
+        const editorHtml = auth.user ? `
+            <div class="watchlist-editor">
+                <input class="watchlist-input" id="watchlistInput" type="text" value="${escapeHtml(state.watchlist.join(', '))}" placeholder="RELIANCE, INFY, HDFCBANK">
+                <button class="watchlist-save-btn" id="watchlistSaveBtn" onclick="saveWatchlist()">
+                    <i data-lucide="save" style="width:13px;height:13px;"></i>
+                    Save
+                </button>
+            </div>
+        ` : '<div class="watchlist-hint">Sign in to edit and persist your symbols.</div>';
+
+        const listHtml = state.watchlist.length
+            ? state.watchlist.map((sym) => {
                 const stock = watchlistStocks[sym] || { name: sym, price: '—', change: '—', positive: true };
                 return `
                     <div class="watchlist-item">
@@ -429,24 +494,75 @@
                         </div>
                     </div>
                 `;
-            }).join('');
+            }).join('')
+            : '<div class="empty-mini">No symbols saved yet.</div>';
+
+        container.innerHTML = `${editorHtml}<div class="watchlist-list">${listHtml}</div><div id="watchlistMessage" class="inline-message" style="display:none;"></div>`;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    window.saveWatchlist = async function () {
+        if (!auth.token) {
+            openAuthModal('login');
+            return;
+        }
+
+        const input = $('watchlistInput');
+        const btn = $('watchlistSaveBtn');
+        const symbols = (input.value || '')
+            .split(/[,\s]+/)
+            .map((s) => s.trim().toUpperCase())
+            .filter(Boolean);
+        const uniqueSymbols = [...new Set(symbols)];
+
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        showMessage('watchlistMessage', '', 'info');
+
+        try {
+            const res = await fetch('/api/watchlist', {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({ watchlist: uniqueSymbols }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Could not save watchlist');
+
+            state.watchlist = data.watchlist;
+            if (auth.user) {
+                auth.user.watchlist = data.watchlist;
+                localStorage.setItem('or_user', JSON.stringify(auth.user));
+            }
+            renderWatchlist();
+            showMessage('watchlistMessage', 'Watchlist saved.', 'success');
+            reconnectSSE();
         } catch (err) {
-            console.warn('Watchlist load error:', err);
+            showMessage('watchlistMessage', err.message || 'Could not save watchlist.', 'error');
+        } finally {
+            const nextBtn = $('watchlistSaveBtn');
+            if (nextBtn) {
+                nextBtn.disabled = false;
+                nextBtn.innerHTML = '<i data-lucide="save" style="width:13px;height:13px;"></i> Save';
+                if (window.lucide) lucide.createIcons();
+            }
         }
     }
 
     // ── Feedback ─────────────────────────────────────────────────────────────
-    window.submitFeedback = async function (alertId, action) {
+    window.submitFeedback = async function (alertId, action, btn) {
         try {
-            const btn = event.target.closest('button');
-            btn.style.opacity = '0.5';
-            btn.style.pointerEvents = 'none';
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+            }
 
-            await fetch('/api/feedback', {
+            const res = await fetch('/api/feedback', {
                 method: 'POST',
                 headers: authHeaders(),
                 body: JSON.stringify({ alert_id: alertId, action, user_id: 'demo' }),
             });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || data.error || 'Could not record feedback');
 
             const alertEl = document.getElementById(`alert-${alertId}`);
             if (alertEl) {
@@ -463,6 +579,12 @@
             loadFeedbackStats();
         } catch (err) {
             console.error('Feedback error:', err);
+            alert(err.message || 'Could not record feedback.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '';
+            }
         }
     };
 
