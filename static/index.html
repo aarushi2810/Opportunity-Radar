@@ -4,17 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Opportunity Radar — Indian Market Signal Intelligence</title>
-    <meta name="description" content="Multi-agent intelligence system that transforms corporate filings, insider trades & regulatory signals into actionable alerts for the Indian stock market.">
+    <meta name="description" content="Multi-agent intelligence system that transforms corporate filings, insider trades and regulatory signals into actionable alerts for the Indian stock market.">
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔭</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body>
 
-<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<!-- Header -->
 <header class="header">
     <div class="header-inner">
         <div class="logo">
-            <div class="logo-icon">🔭</div>
+            <div class="logo-icon">
+                <i data-lucide="radar" style="width:20px;height:20px;"></i>
+            </div>
             <span class="logo-text">Opportunity Radar</span>
             <span class="logo-badge" id="modeBadge">Live</span>
         </div>
@@ -37,11 +43,55 @@
                 <div class="live-dot" id="liveDot"></div>
                 <span id="liveText">Connecting...</span>
             </div>
+            <!-- Auth Controls -->
+            <div class="auth-controls" id="authControls">
+                <button class="auth-btn" id="loginBtn" onclick="openAuthModal('login')">Sign In</button>
+                <button class="auth-btn auth-btn-primary" id="registerBtn" onclick="openAuthModal('register')">Register</button>
+                <div class="user-badge" id="userBadge" style="display:none;">
+                    <i data-lucide="user" style="width:14px;height:14px;"></i>
+                    <span id="userBadgeName"></span>
+                    <button class="auth-signout-btn" onclick="signOut()">Sign out</button>
+                </div>
+            </div>
         </div>
     </div>
 </header>
 
-<!-- ── Main Content ────────────────────────────────────────────────────── -->
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <span id="modalTitle">Sign In</span>
+            <button class="modal-close" onclick="closeAuthModal()">
+                <i data-lucide="x" style="width:16px;height:16px;"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div id="registerFields" style="display:none;">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input class="form-input" id="authName" type="text" placeholder="Your name" autocomplete="name">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input class="form-input" id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input class="form-input" id="authPassword" type="password" placeholder="Min 6 characters" autocomplete="current-password">
+            </div>
+            <div class="form-error" id="authError" style="display:none;"></div>
+            <button class="form-submit-btn" id="authSubmitBtn" onclick="submitAuth()">Sign In</button>
+            <div class="form-toggle">
+                <span id="formToggleText">Don't have an account?</span>
+                <button class="form-toggle-btn" id="formToggleBtn" onclick="toggleAuthMode()">Register</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
 <main class="main">
     <!-- Left Column: Pipeline + Alerts -->
     <div class="content-area">
@@ -49,37 +99,72 @@
         <!-- Pipeline Status -->
         <div class="pipeline-grid" id="pipelineGrid">
             <div class="pipeline-node" id="node-watcher">
-                <div class="pipeline-icon">📄</div>
+                <div class="pipeline-icon">
+                    <i data-lucide="file-text" style="width:18px;height:18px;"></i>
+                </div>
                 <div class="pipeline-label">Filing Watcher</div>
                 <div class="pipeline-status idle" id="status-watcher">idle</div>
             </div>
             <div class="pipeline-node" id="node-classifier">
-                <div class="pipeline-icon">🔬</div>
+                <div class="pipeline-icon">
+                    <i data-lucide="cpu" style="width:18px;height:18px;"></i>
+                </div>
                 <div class="pipeline-label">Signal Classifier</div>
                 <div class="pipeline-status idle" id="status-classifier">idle</div>
             </div>
             <div class="pipeline-node" id="node-enricher">
-                <div class="pipeline-icon">🧠</div>
+                <div class="pipeline-icon">
+                    <i data-lucide="layers" style="width:18px;height:18px;"></i>
+                </div>
                 <div class="pipeline-label">Context Enricher</div>
                 <div class="pipeline-status idle" id="status-enricher">idle</div>
             </div>
             <div class="pipeline-node" id="node-composer">
-                <div class="pipeline-icon">📝</div>
+                <div class="pipeline-icon">
+                    <i data-lucide="pen-line" style="width:18px;height:18px;"></i>
+                </div>
                 <div class="pipeline-label">Alert Composer</div>
                 <div class="pipeline-status idle" id="status-composer">idle</div>
             </div>
             <div class="pipeline-node" id="node-orchestrator">
-                <div class="pipeline-icon">🎯</div>
+                <div class="pipeline-icon">
+                    <i data-lucide="git-branch" style="width:18px;height:18px;"></i>
+                </div>
                 <div class="pipeline-label">Orchestrator</div>
                 <div class="pipeline-status idle" id="status-orchestrator">idle</div>
             </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="filter-group">
+                <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                <input class="filter-input" id="filterSymbol" type="text" placeholder="Symbol (e.g. RELIANCE)" oninput="applyFilters()">
+            </div>
+            <select class="filter-select" id="filterSignal" onchange="applyFilters()">
+                <option value="">All signals</option>
+                <option value="BULLISH">Bullish</option>
+                <option value="BEARISH">Bearish</option>
+                <option value="WATCH">Watch</option>
+                <option value="NEUTRAL">Neutral</option>
+            </select>
+            <select class="filter-select" id="filterPriority" onchange="applyFilters()">
+                <option value="">All priorities</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+            </select>
+            <button class="filter-clear-btn" onclick="clearFilters()">Clear</button>
         </div>
 
         <!-- Alerts Feed -->
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
-                    <span class="card-title-icon">🔔</span>
+                    <span class="card-title-icon">
+                        <i data-lucide="bell" style="width:15px;height:15px;"></i>
+                    </span>
                     Live Signal Alerts
                 </div>
                 <div class="card-badge" id="alertCount">0 alerts</div>
@@ -87,9 +172,11 @@
             <div class="card-body">
                 <div class="alerts-feed" id="alertsFeed">
                     <div class="empty-state" id="emptyState">
-                        <div class="empty-state-icon">📡</div>
+                        <div class="empty-state-icon">
+                            <i data-lucide="radio" style="width:36px;height:36px;color:var(--text-muted);"></i>
+                        </div>
                         <div class="empty-state-title">Scanning for signals...</div>
-                        <div class="empty-state-text">The Filing Watcher is polling SEBI, NSE & BSE for new filings. Alerts will appear here in real-time.</div>
+                        <div class="empty-state-text">The Filing Watcher is polling SEBI, NSE &amp; BSE for new filings. Alerts will appear here in real-time.</div>
                     </div>
                 </div>
             </div>
@@ -103,7 +190,9 @@
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
-                    <span class="card-title-icon">📊</span>
+                    <span class="card-title-icon">
+                        <i data-lucide="bar-chart-2" style="width:15px;height:15px;"></i>
+                    </span>
                     Pipeline Stats
                 </div>
             </div>
@@ -133,7 +222,9 @@
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
-                    <span class="card-title-icon">📈</span>
+                    <span class="card-title-icon">
+                        <i data-lucide="trending-up" style="width:15px;height:15px;"></i>
+                    </span>
                     Signal Distribution
                 </div>
             </div>
@@ -169,7 +260,9 @@
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
-                    <span class="card-title-icon">👁️</span>
+                    <span class="card-title-icon">
+                        <i data-lucide="eye" style="width:15px;height:15px;"></i>
+                    </span>
                     Watchlist
                 </div>
             </div>
@@ -182,7 +275,9 @@
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
-                    <span class="card-title-icon">💬</span>
+                    <span class="card-title-icon">
+                        <i data-lucide="message-square" style="width:15px;height:15px;"></i>
+                    </span>
                     User Feedback
                 </div>
             </div>
@@ -201,7 +296,7 @@
                     </div>
                     <div class="signal-legend-item">
                         <div class="signal-legend-dot" style="background: var(--accent-emerald)"></div>
-                        <span>Buy <span id="fbBuy">0</span></span>
+                        <span>Buy signal <span id="fbBuy">0</span></span>
                     </div>
                 </div>
             </div>
@@ -210,5 +305,11 @@
 </main>
 
 <script src="/static/app.js"></script>
+<script>
+    // Initialise Lucide icons after DOM and script load
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) lucide.createIcons();
+    });
+</script>
 </body>
 </html>
