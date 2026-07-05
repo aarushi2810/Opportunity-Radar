@@ -1,128 +1,177 @@
-"""SQLite-backed user profile store."""
+"""Async PostgreSQL/SQLite user store with JWT authentication support."""
 
 from __future__ import annotations
 
 import json
 import logging
-import sqlite3
-from pathlib import Path
+import uuid
+from typing import Optional
 
+from sqlalchemy import func, select, text, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from infra.auth import hash_password, verify_password
+from infra.database import AsyncSessionLocal
+from infra.db_models import FeedbackModel, UserModel
 from models import UserProfile
 
 logger = logging.getLogger("opportunity_radar.user_store")
 
-DB_PATH = Path(__file__).parent.parent / "data" / "users.db"
-
 
 class UserStore:
-    """SQLite-backed user profile management."""
+    """Async user profile management backed by SQLAlchemy.
 
-    def __init__(self):
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._init_db()
-        self._seed_demo_users()
+    All methods create their own session so they can be called from
+    anywhere in the codebase without injecting a session dependency.
+    """
 
-    def _init_db(self):
-        self._conn.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT DEFAULT '',
-                watchlist TEXT DEFAULT '[]',
-                sectors TEXT DEFAULT '[]',
-                notification_prefs TEXT DEFAULT '{}',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE TABLE IF NOT EXISTS feedback (
-                id TEXT PRIMARY KEY,
-                alert_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                action TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        self._conn.commit()
+    # ── Auth ──────────────────────────────────────────────────────────────────
 
-    def _seed_demo_users(self):
-        """Seed demo users if table is empty."""
-        count = self._conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-        if count > 0:
-            return
+    async def create_user(
+        self, name: str, email: str, password: str
+    ) -> Optional[UserProfile]:
+        """Create a new user account.  Returns None if email already exists."""
+        async with AsyncSessionLocal() as db:
+            existing = await db.scalar(
+                select(UserModel).where(UserModel.email == email)
+            )
+            if existing:
+                return None
 
-        demo_users = [
-            UserProfile(
-                id="user_001",
-                name="Aarushi Sharma",
-                email="aarushi@example.com",
-                watchlist=["RELIANCE", "INFY", "HDFCBANK", "TATAMOTORS", "ITC"],
-                sectors=["Technology", "Banking", "FMCG"],
-            ),
-            UserProfile(
-                id="user_002",
-                name="Rahul Verma",
-                email="rahul@example.com",
-                watchlist=["ADANIENT", "BAJFINANCE", "SWIGGY", "ZOMATO"],
-                sectors=["Infrastructure", "Financial Services", "Technology"],
-            ),
-        ]
-        for user in demo_users:
-            self._insert_user(user)
-        logger.info(f"Seeded {len(demo_users)} demo users")
+            user = UserModel(
+                id=uuid.uuid4().hex[:12],
+                name=name,
+                email=email,
+                password_hash=hash_password(password),
+                watchlist=[],
+                sectors=[],
+                notification_prefs={"push": True, "email": False, "in_app": True},
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            logger.info("User created: %s (%s)", name, email)
+            return self._model_to_profile(user)
 
-    def _insert_user(self, user: UserProfile):
-        self._conn.execute(
-            "INSERT OR IGNORE INTO users (id, name, email, watchlist, sectors, notification_prefs) VALUES (?, ?, ?, ?, ?, ?)",
-            (user.id, user.name, user.email,
-             json.dumps(user.watchlist), json.dumps(user.sectors),
-             json.dumps(user.notification_prefs)),
-        )
-        self._conn.commit()
+    async def authenticate(self, email: str, password: str) -> Optional[UserProfile]:
+        """Verify credentials.  Returns UserProfile on success, None on failure."""
+        async with AsyncSessionLocal() as db:
+            user = await db.scalar(
+                select(UserModel).where(UserModel.email == email)
+            )
+            if not user:
+                return None
+            if not user.password_hash or not verify_password(password, user.password_hash):
+                return None
+            return self._model_to_profile(user)
 
-    def get_all_users(self) -> list[UserProfile]:
-        rows = self._conn.execute("SELECT * FROM users").fetchall()
-        return [self._row_to_user(r) for r in rows]
+    async def get_user_by_email(self, email: str) -> Optional[UserProfile]:
+        async with AsyncSessionLocal() as db:
+            user = await db.scalar(
+                select(UserModel).where(UserModel.email == email)
+            )
+            return self._model_to_profile(user) if user else None
 
-    def get_user(self, user_id: str) -> UserProfile | None:
-        row = self._conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        return self._row_to_user(row) if row else None
+    # ── Queries ───────────────────────────────────────────────────────────────
 
-    def get_users_for_stock(self, symbol: str) -> list[UserProfile]:
-        """Get all users who have this stock in their watchlist."""
-        users = self.get_all_users()
+    async def get_user(self, user_id: str) -> Optional[UserProfile]:
+        async with AsyncSessionLocal() as db:
+            user = await db.get(UserModel, user_id)
+            return self._model_to_profile(user) if user else None
+
+    async def get_all_users(self) -> list[UserProfile]:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(UserModel))
+            return [self._model_to_profile(u) for u in result.scalars().all()]
+
+    async def get_users_for_stock(self, symbol: str) -> list[UserProfile]:
+        """Return users who have this symbol in their watchlist.
+
+        Uses a JSON contains check — works on both Postgres (JSONB) and SQLite.
+        """
+        users = await self.get_all_users()
         return [u for u in users if symbol in u.watchlist]
 
-    def update_watchlist(self, user_id: str, watchlist: list[str]):
-        self._conn.execute(
-            "UPDATE users SET watchlist = ? WHERE id = ?",
-            (json.dumps(watchlist), user_id),
-        )
-        self._conn.commit()
+    # ── Mutations ─────────────────────────────────────────────────────────────
 
-    def record_feedback(self, alert_id: str, user_id: str, action: str):
-        import uuid
-        self._conn.execute(
-            "INSERT INTO feedback (id, alert_id, user_id, action) VALUES (?, ?, ?, ?)",
-            (uuid.uuid4().hex[:12], alert_id, user_id, action),
-        )
-        self._conn.commit()
+    async def update_watchlist(self, user_id: str, watchlist: list[str]):
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                update(UserModel)
+                .where(UserModel.id == user_id)
+                .values(watchlist=watchlist)
+            )
+            await db.commit()
 
-    def get_feedback_stats(self) -> dict:
-        rows = self._conn.execute(
-            "SELECT action, COUNT(*) as cnt FROM feedback GROUP BY action"
-        ).fetchall()
-        return {r["action"]: r["cnt"] for r in rows}
+    async def record_feedback(self, alert_id: str, user_id: str, action: str):
+        async with AsyncSessionLocal() as db:
+            feedback = FeedbackModel(
+                id=uuid.uuid4().hex[:12],
+                alert_id=alert_id,
+                user_id=user_id,
+                action=action,
+            )
+            db.add(feedback)
+            await db.commit()
+
+    async def get_feedback_stats(self) -> dict:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(FeedbackModel.action, func.count().label("cnt"))
+                .group_by(FeedbackModel.action)
+            )
+            return {row.action: row.cnt for row in result.all()}
+
+    # ── Seeding ───────────────────────────────────────────────────────────────
+
+    async def seed_demo_users(self):
+        """Insert demo users if the table is empty (idempotent)."""
+        async with AsyncSessionLocal() as db:
+            count = await db.scalar(select(func.count()).select_from(UserModel))
+            if count and count > 0:
+                return
+
+        demo = [
+            ("Aarushi Sharma", "aarushi@example.com", "demo1234",
+             ["RELIANCE", "INFY", "HDFCBANK", "TATAMOTORS", "ITC"],
+             ["Technology", "Banking", "FMCG"]),
+            ("Rahul Verma", "rahul@example.com", "demo1234",
+             ["ADANIENT", "BAJFINANCE", "SWIGGY", "ZOMATO"],
+             ["Infrastructure", "Financial Services", "Technology"]),
+        ]
+        for name, email, pw, watchlist, sectors in demo:
+            async with AsyncSessionLocal() as db:
+                existing = await db.scalar(
+                    select(UserModel).where(UserModel.email == email)
+                )
+                if not existing:
+                    db.add(UserModel(
+                        id=uuid.uuid4().hex[:12],
+                        name=name,
+                        email=email,
+                        password_hash=hash_password(pw),
+                        watchlist=watchlist,
+                        sectors=sectors,
+                        notification_prefs={"push": True, "email": False, "in_app": True},
+                    ))
+                    await db.commit()
+
+        logger.info("Demo users seeded")
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _row_to_user(row) -> UserProfile:
+    def _model_to_profile(user: UserModel) -> UserProfile:
+        watchlist = user.watchlist if isinstance(user.watchlist, list) else json.loads(user.watchlist or "[]")
+        sectors = user.sectors if isinstance(user.sectors, list) else json.loads(user.sectors or "[]")
+        prefs = user.notification_prefs if isinstance(user.notification_prefs, dict) else json.loads(user.notification_prefs or "{}")
         return UserProfile(
-            id=row["id"],
-            name=row["name"],
-            email=row["email"],
-            watchlist=json.loads(row["watchlist"]),
-            sectors=json.loads(row["sectors"]),
-            notification_prefs=json.loads(row["notification_prefs"]),
+            id=user.id,
+            name=user.name,
+            email=user.email,
+            watchlist=watchlist,
+            sectors=sectors,
+            notification_prefs=prefs,
         )
 
 
