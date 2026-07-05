@@ -13,7 +13,6 @@ from infra.market_data import market_data
 
 logger = logging.getLogger("opportunity_radar.context_enricher")
 
-# Try Gemini for impact analysis
 try:
     import google.generativeai as genai
     HAS_GEMINI = bool(config.GEMINI_API_KEY)
@@ -30,10 +29,10 @@ Filing Summary: {summary}
 Signal Type: {signal_type} (Score: {importance_score})
 
 Market Context:
-- Current Price: ₹{current_price}
+- Current Price: Rs {current_price}
 - 1D Change: {change_1d}%  |  1W Change: {change_1w}%  |  1M Change: {change_1m}%
-- P/E Ratio: {pe_ratio}  |  EPS: ₹{eps}
-- Market Cap: ₹{market_cap_cr} Cr
+- P/E Ratio: {pe_ratio}  |  EPS: Rs {eps}
+- Market Cap: Rs {market_cap_cr} Cr
 - Sector: {sector}
 - Analyst Consensus: {consensus}
 
@@ -48,8 +47,9 @@ Be specific with numbers. Do NOT give buy/sell recommendations — only factual 
 
 
 class ContextEnrichmentAgent:
-    """Pulls price history, fundamentals, peer comparisons.
-    Adds 'so what?' layer — translates event into EPS/margin/debt impact.
+    """Pulls price history, fundamentals, and peer comparisons.
+
+    Adds a 'so what?' layer that translates the event into EPS/margin/debt impact.
     """
 
     def __init__(self):
@@ -59,7 +59,7 @@ class ContextEnrichmentAgent:
         if HAS_GEMINI:
             try:
                 self._model = genai.GenerativeModel("gemini-2.0-flash")
-                logger.info("🧠 Context Enricher using Gemini for impact analysis")
+                logger.info("Context Enricher using Gemini for impact analysis")
             except Exception:
                 pass
 
@@ -95,63 +95,63 @@ class ContextEnrichmentAgent:
 
         if ft == "INSIDER_TRADE":
             return base + (
-                f"Insider purchase signals strong management conviction at current levels (₹{price}). "
+                f"Insider purchase signals strong management conviction at current levels (Rs {price}). "
                 f"At PE of {pe}x, the stock trades near sector average for {sector}. "
-                f"Historically, insider buys of this magnitude have preceded 5-15% appreciation in 60-90 days. "
-                f"Key monitorable: whether additional insiders follow with similar transactions."
+                "Historically, insider buys of this magnitude have preceded 5-15% appreciation in 60-90 days. "
+                "Key monitorable: whether additional insiders follow with similar transactions."
             )
         elif ft == "DRHP":
             return base + (
-                f"IPO filing indicates the company is seeking public market valuation. "
-                f"At the proposed issue size, implied market cap suggests premium to listed peers. "
-                f"Revenue growth trajectory of the company will be the key valuation driver. "
-                f"Watch for anchor investor allocation and grey market premium as listing indicators."
+                "IPO filing indicates the company is seeking public market valuation. "
+                "At the proposed issue size, implied market cap suggests premium to listed peers. "
+                "Revenue growth trajectory of the company will be the key valuation driver. "
+                "Watch for anchor investor allocation and grey market premium as listing indicators."
             )
         elif ft == "PLEDGE":
             return base + (
                 f"Rising promoter pledge from current levels is a red flag for governance. "
-                f"At PE of {pe}x and current price ₹{price}, any forced pledge invocation could trigger 10-20% downside. "
+                f"At PE of {pe}x and current price Rs {price}, any forced pledge invocation could trigger 10-20% downside. "
                 f"Peer comparison shows lower pledge ratios in the sector. "
-                f"Monitor covenant triggers and margin call events weekly."
+                "Monitor covenant triggers and margin call events weekly."
             )
         elif ft == "BULK_DEAL":
             return base + (
-                f"Institutional bulk buy at ₹{price} represents significant conviction from smart money. "
-                f"The acquisition size relative to daily volume suggests accumulation phase. "
+                f"Institutional bulk buy at Rs {price} represents significant conviction from smart money. "
+                "The acquisition size relative to daily volume suggests accumulation phase. "
                 f"At PE of {pe}x in {sector}, the stock appears attractively valued vs peers. "
-                f"Historical pattern: institutional bulk buys in quality names see follow-through buying within 2 weeks."
+                "Historical pattern: institutional bulk buys in quality names see follow-through buying within 2 weeks."
             )
         elif ft == "BOARD_MEETING":
             return base + (
-                f"Capital return via dividend + buyback at ₹{price} levels signals strong cash generation. "
-                f"Buyback at premium to CMP is EPS-accretive; estimated 2-3% EPS boost from share reduction. "
-                f"Revenue guidance upgrade to 4-6% indicates improving demand visibility. "
-                f"Combined yield (dividend + buyback) makes this attractive vs {sector} peers."
+                f"Capital return via dividend and buyback at Rs {price} signals strong cash generation. "
+                "Buyback at premium to CMP is EPS-accretive; estimated 2-3% EPS boost from share reduction. "
+                "Revenue guidance upgrade indicates improving demand visibility. "
+                f"Combined yield makes this attractive vs {sector} peers."
             )
         elif ft == "QUARTERLY_RESULT":
             return base + (
-                f"Strong quarterly performance beats expectations on profit and margins. "
-                f"NIM expansion and declining NPAs signal improving business fundamentals. "
+                "Strong quarterly performance beats expectations on profit and margins. "
+                "NIM expansion and declining NPAs signal improving business fundamentals. "
                 f"At PE of {pe}x, re-rating potential exists if the trajectory sustains. "
-                f"Credit growth outpacing system average — market share gains in key segments."
+                "Credit growth outpacing system average — market share gains in key segments."
             )
         elif ft == "SHAREHOLDING":
             return base + (
-                f"FII ownership surge to multi-year highs at ₹{price} indicates global re-allocation to the stock. "
-                f"Notable institutional buyers are typically lead indicators for sustained re-rating. "
-                f"Declining MF ownership creates potential supply — but FII flows dominate the narrative. "
-                f"At PE of {pe}x in {sector}, valuation supports foreign investor thesis."
+                f"FII ownership surge to multi-year highs at Rs {price} indicates global re-allocation to the stock. "
+                "Notable institutional buyers are typically lead indicators for sustained re-rating. "
+                "Declining MF ownership creates potential supply — but FII flows dominate the narrative. "
+                f"At PE of {pe}x in {sector}, valuation supports the foreign investor thesis."
             )
         elif ft == "CORPORATE_ACTION":
             return base + (
-                f"Stock split improves liquidity and retail accessibility at ₹{price} pre-split levels. "
-                f"Historically, quality stocks see 8-12% appreciation in 6 months post-split. "
-                f"Improved lot size enables F&O participation for retail traders. "
+                f"Stock split improves liquidity and retail accessibility at Rs {price} pre-split levels. "
+                "Historically, quality stocks see 8-12% appreciation in 6 months post-split. "
+                "Improved lot size enables F&O participation for retail traders. "
                 f"At PE of {pe}x, fundamentals support the management's timing of this action."
             )
         else:
             return base + (
-                f"Filing noted at current price ₹{price} (PE: {pe}x). "
+                f"Filing noted at current price Rs {price} (PE: {pe}x). "
                 f"Sector: {sector}. Impact assessment requires further analysis."
             )
 
@@ -161,7 +161,7 @@ class ContextEnrichmentAgent:
             return None
 
         peers_str = ", ".join(
-            f"{p.name} (PE: {p.pe_ratio}x, MCap: ₹{p.market_cap_cr} Cr)"
+            f"{p.name} (PE: {p.pe_ratio}x, MCap: Rs {p.market_cap_cr} Cr)"
             for p in ctx["peers"]
         ) or "No peer data available"
 
@@ -185,23 +185,19 @@ class ContextEnrichmentAgent:
         )
 
         try:
-            response = await asyncio.to_thread(
-                self._model.generate_content, prompt
-            )
+            response = await asyncio.to_thread(self._model.generate_content, prompt)
             return response.text.strip()
-        except Exception as e:
-            logger.warning(f"LLM impact analysis failed: {e}")
+        except Exception as exc:
+            logger.warning("LLM impact analysis failed: %s", exc)
             return None
 
     async def enrich(self, filing: RawFiling, signal: ClassifiedSignal) -> EnrichedSignal:
         """Enrich a classified signal with market context and impact analysis."""
         self._status = "enriching"
-        logger.info(f"🔍 Enriching: {filing.stock_symbol} (signal: {signal.signal_type.value})")
+        logger.info("Enriching: %s (signal: %s)", filing.stock_symbol, signal.signal_type.value)
 
-        # Pull market data
         ctx = self._enrich_with_market_data(signal, filing)
 
-        # Generate impact analysis
         impact = await self._generate_llm_impact(filing, signal, ctx)
         if impact is None:
             impact = self._generate_rule_based_impact(filing, signal, ctx)
@@ -223,18 +219,17 @@ class ContextEnrichmentAgent:
 
         self._total_enriched += 1
         self._status = "idle"
-        logger.info(f"✅ Enriched: {filing.stock_symbol} — impact analysis generated")
+        logger.info("Enriched: %s — impact analysis generated", filing.stock_symbol)
         return enriched
 
     async def handle_signal(self, data: tuple):
         """Handler for message bus — enrich and publish result."""
         filing, signal = data
 
-        # Only enrich if importance score meets threshold
         if signal.importance_score < config.SIGNAL_THRESHOLD:
             logger.info(
-                f"⏭️ Skipping low-score signal: {filing.stock_symbol} "
-                f"(score: {signal.importance_score:.2f} < {config.SIGNAL_THRESHOLD})"
+                "Skipping low-score signal: %s (score: %.2f < %.2f)",
+                filing.stock_symbol, signal.importance_score, config.SIGNAL_THRESHOLD,
             )
             return
 
